@@ -1,30 +1,29 @@
 import React from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useSearchParams, useLoaderData } from "react-router-dom";
 import { getVans } from "../../api";
 
+export function loader() {
+  const data = getVans();
+  return data;
+}
+
+// BRISEMO:
+// 1) Brisemo vans useState zato sto dobijamo podatke iz loadera
+// 2) Brisemo error state zato sto cemo ovoj ili parent ruti proslediti error komponentnu
+// na koju ce se app rutirati u slucaju greske (mozemo i da ostanemo na istoj ruti i prikazemo gresku ako zelimo)
+// 3) Brisemo loading state zato sto se ruta ne menja dok ne dobije sve podatke potrebne komponentama
+// 4) Brisemo useEffect jer fetchujemo podatke u loaderu
+
+//DODAJEMO:
+// 1) Dodajemo loader funkciju koju eksportujemo. Tu loader funkciju importujemo tamo gde definisemo rutu koja renderuje
+// ovu komponentnu i prosledjujemo toj ruti loader prop koji uzima nasu eksportovanu loader funkciju kao vrednost.
+// Ta loader funkcija se poziva kada odemo na path rute
+// 2) Dodajemo useLoaderData hook, on nam vraca podatke koji su returnovani u nasoj loader funkciji.
+// 3) stavljamo podatke koje vraca useLoaderData() u neku varijablu i mozemo da koristimo dalje te vrednosti
 export default function Vans() {
+  const vans = useLoaderData();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [vans, setVans] = React.useState([]);
-  const [loading, setLoading] = React.useState(false);
-  const [error, setError] = React.useState(null);
-
   const typeFilter = searchParams.get("type");
-
-  React.useEffect(() => {
-    async function loadVans() {
-      setLoading(true);
-      try {
-        const data = await getVans();
-        setVans(data);
-      } catch (err) {
-        setError(err);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadVans();
-  }, []);
 
   const displayedVans = typeFilter ? vans.filter((van) => van.type === typeFilter) : vans;
 
@@ -59,14 +58,6 @@ export default function Vans() {
       }
       return prevParams;
     });
-  }
-
-  if (loading) {
-    return <h1>Loading...</h1>;
-  }
-
-  if (error) {
-    return <h1>There was an error: {error.message}</h1>;
   }
 
   return (
