@@ -2,8 +2,8 @@ import React from "react";
 import { Link, useLocation, useLoaderData } from "react-router-dom";
 import { requireAuth } from "../../utils";
 
-export const loader = async ({ params }) => {
-  await requireAuth();
+export const loader = async ({ request, params }) => {
+  await requireAuth(request);
   const response = await fetch(`/api/vans/${params.id}`);
   const data = await response.json();
   return data.vans;
