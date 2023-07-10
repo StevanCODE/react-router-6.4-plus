@@ -1,12 +1,12 @@
-import React from "react";
-import { Link, useSearchParams, useLoaderData } from "react-router-dom";
+import React, { Suspense } from "react";
+import { Link, useSearchParams, useLoaderData, defer, Await } from "react-router-dom";
 import { getVans } from "../../api";
 import { requireAuth } from "../../utils";
 
 export function loader({ request }) {
   requireAuth(request);
-  const data = getVans();
-  return data;
+  const vans = getVans();
+  return defer({ vans });
 }
 
 // BRISEMO:
@@ -23,78 +23,86 @@ export function loader({ request }) {
 // 2) Dodajemo useLoaderData hook, on nam vraca podatke koji su returnovani u nasoj loader funkciji.
 // 3) stavljamo podatke koje vraca useLoaderData() u neku varijablu i mozemo da koristimo dalje te vrednosti
 export default function Vans() {
-  const vans = useLoaderData();
+  const { vans } = useLoaderData();
   const [searchParams, setSearchParams] = useSearchParams();
   const typeFilter = searchParams.get("type");
 
-  const displayedVans = typeFilter ? vans.filter((van) => van.type === typeFilter) : vans;
+  //Deferd function - uzima resolved vrednost promise-a iz Await-a i prosledjuje funkciji
+  const resolvedFunction = (loadedVans) => {
+    function handleFilterChange(key, value) {
+      setSearchParams((prevParams) => {
+        if (value === null) {
+          prevParams.delete(key);
+        } else {
+          prevParams.set(key, value);
+        }
+        return prevParams;
+      });
+    }
+    const displayedVans = typeFilter ? loadedVans.filter((van) => van.type === typeFilter) : loadedVans;
+    const vanElements = displayedVans.map((van) => (
+      <div key={van.id} className="van-tile">
+        <Link
+          to={van.id}
+          state={{
+            search: `?${searchParams.toString()}`,
+            type: typeFilter,
+          }}
+        >
+          <img src={van.imageUrl} />
+          <div className="van-info">
+            <h3>{van.name}</h3>
+            <p>
+              ${van.price}
+              <span>/day</span>
+            </p>
+          </div>
+          <i className={`van-type ${van.type} selected`}>{van.type}</i>
+        </Link>
+      </div>
+    ));
+    return (
+      <>
+        <div className="van-list-filter-buttons">
+          <button
+            onClick={() => handleFilterChange("type", "simple")}
+            className={`van-type simple 
+                        ${typeFilter === "simple" ? "selected" : ""}`}
+          >
+            Simple
+          </button>
+          <button
+            onClick={() => handleFilterChange("type", "luxury")}
+            className={`van-type luxury 
+                        ${typeFilter === "luxury" ? "selected" : ""}`}
+          >
+            Luxury
+          </button>
+          <button
+            onClick={() => handleFilterChange("type", "rugged")}
+            className={`van-type rugged 
+                        ${typeFilter === "rugged" ? "selected" : ""}`}
+          >
+            Rugged
+          </button>
 
-  const vanElements = displayedVans.map((van) => (
-    <div key={van.id} className="van-tile">
-      <Link
-        to={van.id}
-        state={{
-          search: `?${searchParams.toString()}`,
-          type: typeFilter,
-        }}
-      >
-        <img src={van.imageUrl} />
-        <div className="van-info">
-          <h3>{van.name}</h3>
-          <p>
-            ${van.price}
-            <span>/day</span>
-          </p>
+          {typeFilter ? (
+            <button onClick={() => handleFilterChange("type", null)} className="van-type clear-filters">
+              Clear filter
+            </button>
+          ) : null}
         </div>
-        <i className={`van-type ${van.type} selected`}>{van.type}</i>
-      </Link>
-    </div>
-  ));
-
-  function handleFilterChange(key, value) {
-    setSearchParams((prevParams) => {
-      if (value === null) {
-        prevParams.delete(key);
-      } else {
-        prevParams.set(key, value);
-      }
-      return prevParams;
-    });
-  }
+        <div className="van-list">{vanElements}</div>;
+      </>
+    );
+  };
 
   return (
     <div className="van-list-container">
       <h1>Explore our van options</h1>
-      <div className="van-list-filter-buttons">
-        <button
-          onClick={() => handleFilterChange("type", "simple")}
-          className={`van-type simple 
-                        ${typeFilter === "simple" ? "selected" : ""}`}
-        >
-          Simple
-        </button>
-        <button
-          onClick={() => handleFilterChange("type", "luxury")}
-          className={`van-type luxury 
-                        ${typeFilter === "luxury" ? "selected" : ""}`}
-        >
-          Luxury
-        </button>
-        <button
-          onClick={() => handleFilterChange("type", "rugged")}
-          className={`van-type rugged 
-                        ${typeFilter === "rugged" ? "selected" : ""}`}
-        >
-          Rugged
-        </button>
-
-        {typeFilter ? (
-          <button onClick={() => handleFilterChange("type", null)} className="van-type clear-filters">
-            Clear filter
-          </button>
-        ) : null}
-      </div>
-      <div className="van-list">{vanElements}</div>
+      <Suspense fallback={<p>Loading...</p>}>
+        <Await resolve={vans}>{(loadedVans) => resolvedFunction(loadedVans)}</Await>
+      </Suspense>
     </div>
   );
 }
